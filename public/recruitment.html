@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recruitment Schedule</title>
+    <link rel="stylesheet" href="recruitment.css">
+    
+</head>
+<body>
+
+    <div class="sidebar">
+        <a href="/dashboard.html">🏠 Dashboard</a>
+        <a href="/recruitment.html" class="active">💼 Recruitment</a>
+        <a href="/training.html">📈 Training</a>
+        <a href="/attendance.html">📅 Attendance</a>
+        <a href="/employeeDetails.html">👤 Employee Details</a>
+        <a href="/leaveRequest.html">📝 Leave Request</a>
+        
+        
+    </div>
+
+    <div class="header">RECRUITMENT</div>
+
+    <div class="content container mt-4">
+        <h2 class="mb-4">Recruitment Schedule</h2>
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>Job Title</th>
+                    <th>Application Deadline</th>
+                    <th>Interview Date</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="recruitmentTableBody"></tbody>
+        </table>
+
+        <h3 class="mt-4">Add New Recruitment</h3>
+        <form id="recruitmentForm">
+            <input type="text" id="jobTitle" class="form-control mb-2" placeholder="Job Title" required>
+            <input type="date" id="applicationDeadline" class="form-control mb-2" required>
+            <input type="date" id="interviewDate" class="form-control mb-2" required>
+            <button type="submit" class="btn btn-primary">Add Recruitment</button>
+        </form>
+
+        <h3 class="mt-4">Apply for a Position</h3>
+        <form id="applicationForm">
+            <input type="text" id="applicantName" class="form-control mb-2" placeholder="Full Name" required>
+            <input type="tel" id="applicantPhone" class="form-control mb-2" placeholder="Phone Number" required>
+            <input type="number" id="applicantAge" class="form-control mb-2" placeholder="Age" required>
+            <select id="jobId" class="form-control mb-2" required>
+                <option value="">Select Job</option>
+            </select>
+            <button type="submit" class="btn btn-success">Apply</button>
+        </form>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", fetchRecruitment);
+
+        function formatDate(isoString) {
+    const date = new Date(isoString);
+    return date.toISOString().split("T")[0]; // Extract YYYY-MM-DD
+}
+
+        function fetchRecruitment() {
+            fetch("http://localhost:3000/recruitment", {
+                headers: { "Authorization": "Bearer " + localStorage.getItem("token") } // Ensure token authentication
+            })
+            .then(response => response.json())
+            .then(data => {
+                const tableBody = document.getElementById("recruitmentTableBody");
+                const jobSelect = document.getElementById("jobId");
+
+                tableBody.innerHTML = "";
+                jobSelect.innerHTML = '<option value="">Select Job</option>'; // Reset job selection
+
+                data.forEach(row => {
+                    tableBody.innerHTML += `
+                        <tr>
+                            <td>${row.job_title}</td>
+                            <td>${formatDate(row.application_deadline)}</td>
+                            <td>${formatDate(row.interview_date)}</td>
+                            <td><button class='apply-btn' data-id="${row.id}">Apply</button></td>
+                        </tr>
+                    `;
+                    jobSelect.innerHTML += `<option value="${row.id}">${row.job_title}</option>`;
+                });
+
+                document.querySelectorAll(".apply-btn").forEach(button => {
+                    button.addEventListener("click", function () {
+                        document.getElementById("jobId").value = this.getAttribute("data-id");
+                    });
+                });
+            })
+            .catch(error => console.error("Error fetching recruitment data:", error));
+        }
+
+        document.getElementById("recruitmentForm").addEventListener("submit", function(event) {
+            event.preventDefault();
+            const jobTitle = document.getElementById("jobTitle").value;
+            const applicationDeadline = document.getElementById("applicationDeadline").value;
+            const interviewDate = document.getElementById("interviewDate").value;
+
+            fetch("http://localhost:3000/recruitment", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": "Bearer " + localStorage.getItem("token")
+                },
+                body: JSON.stringify({ job_title: jobTitle, application_deadline: applicationDeadline, interview_date: interviewDate })
+            })
+            .then(response => response.json())
+            .then(() => {
+                fetchRecruitment();
+                document.getElementById("recruitmentForm").reset();
+            })
+            .catch(error => console.error("Error adding recruitment:", error));
+        });
+
+        document.getElementById("applicationForm").addEventListener("submit", function(event) {
+            event.preventDefault();
+            const applicantName = document.getElementById("applicantName").value;
+            const applicantPhone = document.getElementById("applicantPhone").value;
+            const applicantAge = document.getElementById("applicantAge").value;
+            const jobId = document.getElementById("jobId").value;
+
+            if (!jobId) {
+                alert("Please select a job to apply for.");
+                return;
+            }
+
+            fetch("http://localhost:3000/apply", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": "Bearer " + localStorage.getItem("token")
+                },
+                body: JSON.stringify({ applicant_name: applicantName, applicant_phone: applicantPhone, applicant_age: applicantAge, job_id: jobId })
+            })
+            .then(response => response.json())
+            .then(() => {
+                alert("Application submitted successfully!");
+                document.getElementById("applicationForm").reset();
+            })
+            .catch(error => console.error("Error submitting application:", error));
+        });
+    </script>
+</body>
+</html>

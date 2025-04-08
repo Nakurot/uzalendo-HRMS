@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Training Schedule</title>
+    <link rel="stylesheet" href="training.css">
+</head>
+<body>
+    <div class="sidebar">
+        <a href="/dashboard.html">🏠 Dashboard</a>
+        <a href="/recruitment.html"> 💼 Recruitment</a>
+        <a href="/training.html" class="active">📈 Training</a>
+        <a href="/attendance.html">📅 Attendance</a>
+        <a href="/employeeDetails.html">👤 Employee Details</a>
+        <a href="/leaveRequest.html">📝 Leave Request</a>
+      
+       
+    </div>
+
+    <div class="header">TRAINING</div>
+
+    <div class="content container mt-4">
+        <h2 class="mb-4">Training Schedule</h2>
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>Training Title</th>
+                    <th>Date</th>
+                    <th>Time</th>
+                    <th>Location</th>
+                </tr>
+            </thead>
+            <tbody id="trainingTableBody"></tbody>
+        </table>
+
+        <h3 class="mt-4">Schedule New Training</h3>
+        <form id="trainingForm">
+            <input type="text" id="trainingTitle" class="form-control mb-2" placeholder="Training Title" required>
+            <input type="date" id="trainingDate" class="form-control mb-2" required>
+            <input type="time" id="trainingTime" class="form-control mb-2" required>
+            <input type="text" id="trainingLocation" class="form-control mb-2" placeholder="Location" required>
+            <button type="submit" class="btn btn-primary">Add Training</button>
+        </form>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", fetchTraining);
+
+        function formatDate(isoString) {
+    const date = new Date(isoString);
+    return date.toISOString().split("T")[0]; // Extract YYYY-MM-DD
+}
+
+
+function formatTime(isoString) {
+    const date = new Date(isoString);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); // Extract HH:MM AM/PM
+}
+
+        async function fetchTraining() {
+            try {
+                let response = await fetch("http://localhost:3000/training", {
+                    headers: {
+                        "Authorization": "Bearer " + localStorage.getItem("token")
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+
+                let data = await response.json(); 
+                console.log("Training Data:", data);
+
+                // ✅ Populate the table with training data
+                const tableBody = document.getElementById("trainingTableBody");
+                tableBody.innerHTML = ""; // Clear old data
+                
+                data.forEach(row => {
+                    tableBody.innerHTML += `
+                        <tr>
+                            <td>${row.title}</td>
+                            <td>${formatDate(row.date)}</td>
+                            <td>${row.time}</td>
+                            <td>${row.location}</td>
+                        </tr>
+                    `;
+                });
+
+            } catch (error) {
+                console.error("Error fetching training data:", error);
+            }
+        }
+
+        document.getElementById("trainingForm").addEventListener("submit", function(event) {
+            event.preventDefault();
+            const trainingTitle = document.getElementById("trainingTitle").value;
+            const trainingDate = document.getElementById("trainingDate").value;
+            const trainingTime = document.getElementById("trainingTime").value;
+            const trainingLocation = document.getElementById("trainingLocation").value;
+
+            fetch("http://localhost:3000/training", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": "Bearer " + localStorage.getItem("token")
+                },
+                body: JSON.stringify({ 
+                    title: trainingTitle, 
+                    date: trainingDate, 
+                    time: trainingTime, 
+                    location: trainingLocation 
+                })
+            })
+            .then(response => response.json())
+            .then(() => {
+                fetchTraining(); // Refresh table
+                document.getElementById("trainingForm").reset();
+            })
+            .catch(error => console.error("Error adding training:", error));
+        });
+    </script>
+</body>
+</html>

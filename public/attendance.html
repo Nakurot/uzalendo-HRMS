@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Uzalendo Campus HRMS - Attendance</title>
+    <link rel="stylesheet" href="attendance.css">
+</head>
+<body>
+    <div class="sidebar">
+        <a href="/dashboard.html">🏠 Dashboard</a>
+        <a href="/recruitment.html">💼 Recruitment</a>
+        <a href="/training.html">📈 Training</a>
+        <a href="/attendance.html" class="active">📅 Attendance</a>
+        <a href="/employeeDetails.html">👤 Employee Details</a>
+        <a href="/leaveRequest.html">📝 Leave Request</a>
+       
+        
+    </div>
+
+    <div class="header">ATTENDANCE RECORDS</div>
+
+    <div class="content">
+        <div class="filters">
+            <div class="filter-box">
+                <label>DEPARTMENT</label>
+                <select id="departmentFilter">
+                    <option value="all">All Departments</option>
+                    <option value="HR">HR</option>
+                    <option value="IT">IT</option>
+                    <option value="Finance">Finance</option>
+                </select>
+            </div>
+            <div class="filter-box">
+                <label>DATE RANGE</label>
+                <input type="date" id="attendanceDate">
+            </div>
+            <div class="filter-box">
+                <label>STATUS</label>
+                <select id="statusFilter">
+                    <option value="all">All</option>
+                    <option value="Present">Present</option>
+                    <option value="Absent">Absent</option>
+                    <option value="Leave">Leave</option>
+                </select>
+            </div>
+            <button class="apply-btn" onclick="fetchAttendanceData()">APPLY FILTERS</button>
+        </div>
+
+        <div id="attendanceStats" class="stats">
+            <div class="stat-box"><h3>TOTAL EMPLOYEES</h3><p id="totalEmployees">0</p></div>
+            <div class="stat-box"><h3>PRESENT</h3><p id="present">0</p></div>
+            <div class="stat-box"><h3>ABSENT</h3><p id="absent">0</p></div>
+            <div class="stat-box"><h3>LEAVE</h3><p id="leave">0</p></div>
+        </div>
+
+        <table class="attendance-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="attendanceTable">
+                <tr><td colspan="2">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', fetchAttendanceData);
+
+    async function fetchAttendanceData() {
+        const token = localStorage.getItem("token");
+        if (!token) {
+            alert("You are not logged in!");
+            window.location.href = "/login.html";
+            return;
+        }
+
+        // Decode JWT manually
+        const user = parseJwt(token);
+        if (!user) {
+            alert("Authentication error. Please log in again.");
+            logout();
+            return;
+        }
+
+        // Check token expiration
+        const currentTime = Math.floor(Date.now() / 1000);
+        if (user.exp && user.exp < currentTime) {
+            alert("Session expired. Please log in again.");
+            logout();
+            return;
+        }
+
+        let filters = {
+            department: document.getElementById("departmentFilter").value,
+            status: document.getElementById("statusFilter").value,
+            date: document.getElementById("attendanceDate").value,
+        };
+
+        let queryParams = new URLSearchParams(filters).toString();
+
+        try {
+            const response = await fetch(`/attendance?${queryParams}`, {
+                method: "GET",
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Content-Type": "application/json",
+                },
+            });
+
+            if (!response.ok) {
+                console.error("Response error:", response.status, response.statusText);
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log("Attendance Data:", data);
+
+            if (!Array.isArray(data)) {
+                throw new Error("Invalid response format");
+            }
+
+            updateAttendanceStats(data);
+            populateAttendanceTable(data);
+        } catch (error) {
+            console.error("Error fetching attendance data:", error);
+            document.getElementById("attendanceTable").innerHTML = "<tr><td colspan='2'>Error loading data</td></tr>";
+        }
+    }
+
+    function parseJwt(token) {
+        try {
+            const base64Url = token.split('.')[1];
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            const jsonPayload = decodeURIComponent(atob(base64).split('').map(c =>
+                '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
+            ).join(''));
+
+            return JSON.parse(jsonPayload);
+        } catch (error) {
+            console.error("Error parsing JWT:", error);
+            return null;
+        }
+    }
+
+    function updateAttendanceStats(data) {
+        let total = data.length;
+        let present = data.filter(item => item.status === "Present").length;
+        let absent = data.filter(item => item.status === "Absent").length;
+        let leave = data.filter(item => item.status === "Leave").length;
+
+        document.getElementById("totalEmployees").textContent = total;
+        document.getElementById("present").textContent = present;
+        document.getElementById("absent").textContent = absent;
+        document.getElementById("leave").textContent = leave;
+    }
+
+    function populateAttendanceTable(data) {
+        const tableBody = document.getElementById("attendanceTable");
+        tableBody.innerHTML = data.length
+            ? data.map((item) => `<tr><td>${item.name}</td><td>${item.status}</td></tr>`).join("")
+            : "<tr><td colspan='2'>No attendance records found</td></tr>";
+    }
+
+    function logout() {
+        localStorage.removeItem("token");
+        window.location.href = "/login.html";
+    }
+    </script>
+</body>
+</html>

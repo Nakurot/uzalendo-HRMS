@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Uzalendo Campus HRMS - Leave Request</title>
+    <link rel="stylesheet" href="leaverequest.css">
+</head>
+<body>
+    <div class="sidebar">
+        <a href="dashboard.html">🏠 Dashboard</a>
+        <a href="recruitment.html"> 💼 Recruitment</a>
+        <a href="training.html">📈 Training</a>
+        <a href="attendance.html">📅 Attendance</a>
+        <a href="employeeDetails.html">👤 Employee Details</a>
+        <a href="leaveRequest.html" class="active">📝 Leave Request</a>
+       
+        
+    </div>
+    
+    <div class="content">
+        <div class="header">LEAVE REQUEST</div>
+
+        <div class="filters">
+            <div>
+                <label>Department:</label>
+                <select id="departmentFilter">
+                    <option value="all">All</option>
+                    
+                </select>
+            </div>
+            <div>
+                <label>Date Range:</label>
+                <input type="date" id="startDate"> - <input type="date" id="endDate">
+            </div>
+            <div>
+                <label>Status:</label>
+                <select id="statusFilter">
+                    <option value="all">All</option>
+                    <option value="Pending">Pending</option>
+                    <option value="Approved">Approved</option>
+                    <option value="Rejected">Rejected</option>
+                </select>
+            </div>
+            <div>
+                <button class="filter-button" onclick="applyFilters()">Apply Filters</button>
+                <button class="reset-button" onclick="resetFilters()">Reset Filters</button>
+            </div>
+        </div>
+
+        <div class="stats">
+            <div class="stat-box pending">⏳ Pending Requests: <span id="pendingCount">0</span></div>
+            <div class="stat-box approved">✔️ Approved Requests: <span id="approvedCount">0</span></div>
+            <div class="stat-box rejected">❌ Rejected Requests: <span id="rejectedCount">0</span></div>
+        </div>
+
+        <table class="leave-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Employee ID</th>
+                    <th>Start Date</th>
+                    <th>End Date</th>
+                    <th>Leave Type</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="leaveTableBody">
+                <tr>
+                    <td colspan="6">Loading...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+    await fetchLeaveRequests();
+});
+
+async function fetchLeaveRequests(filters = {}) {
+    const token = localStorage.getItem('token');
+    if (!token) {
+        window.location.href = 'login.html';
+        return;
+    }
+
+    let query = new URLSearchParams();
+    for (let key in filters) {
+        if (filters[key] && filters[key] !== "all") query.append(key, filters[key]);
+    }
+
+    try {
+        const response = await fetch(`/api/leaveRequests?${query.toString()}`, {
+            method: 'GET',
+            headers: { 
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) throw new Error(`HTTP Error! Status: ${response.status}`);
+        
+        const data = await response.json();
+        console.log('Fetched Data:', data);
+
+        populateLeaveTable(data);
+        updateLeaveStats(data);
+    } catch (error) {
+        console.error('Error fetching leave requests:', error);
+        document.getElementById('leaveTableBody').innerHTML = '<tr><td colspan="6">Error loading data</td></tr>';
+    }
+}
+
+function populateLeaveTable(data) {
+    const tableBody = document.getElementById('leaveTableBody');
+    if (data.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="6">No leave requests found</td></tr>';
+        return;
+    }
+
+    tableBody.innerHTML = data.map(item => `
+        <tr>
+            <td>${item.id}</td>
+            <td>${item.employee_id}</td>
+            <td>${new Date(item.start_date).toLocaleDateString()}</td>
+            <td>${new Date(item.end_date).toLocaleDateString()}</td>
+            <td>${item.leave_type}</td>
+            <td>${item.status}</td>
+        </tr>
+    `).join('');
+}
+
+function updateLeaveStats(data) {
+    let pending = 0, approved = 0, rejected = 0;
+    data.forEach(item => {
+        if (item.status === 'Pending') pending++;
+        if (item.status === 'Approved') approved++;
+        if (item.status === 'Rejected') rejected++;
+    });
+
+    document.getElementById('pendingCount').textContent = pending;
+    document.getElementById('approvedCount').textContent = approved;
+    document.getElementById('rejectedCount').textContent = rejected;
+}
+
+function applyFilters() {
+    const filters = {
+        department: document.getElementById('departmentFilter').value,
+        status: document.getElementById('statusFilter').value,
+        startDate: document.getElementById('startDate').value || null,
+        endDate: document.getElementById('endDate').value || null
+    };
+
+    fetchLeaveRequests(filters);
+}
+
+function resetFilters() {
+    document.getElementById('departmentFilter').value = 'all';
+    document.getElementById('statusFilter').value = 'all';
+    document.getElementById('startDate').value = '';
+    document.getElementById('endDate').value = '';
+    fetchLeaveRequests();
+}
+
+function logout() {
+    localStorage.removeItem('token');
+    window.location.href = 'login.html';
+}
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Uzalendo Campus HRMS - Employee Details</title>
+    <link rel="stylesheet" href="employeedetails.css">
+</head>
+<body>
+    <div class="sidebar">
+        <a href="/dashboard.html">🏠 Dashboard</a>
+        <a href="/recruitment.html">💼 Recruitment</a>
+        <a href="/training.html">📈 Training</a>
+        <a href="/attendance.html">📅 Attendance</a>
+        <a href="/employeeDetails.html" class="active">👤 Employee Details</a>
+        <a href="/leaveRequest.html">📝 Leave Request</a>
+        
+        
+    </div>
+
+    <div class="content">
+        <div class="header">EMPLOYEE DETAILS</div>
+
+        <label for="departmentFilter"><strong>Filter by Department:</strong></label>
+        <select id="departmentFilter">
+            <option value="">All Departments</option>
+            <option value="IT">IT</option>
+            <option value="HR">HR</option>
+            <option value="Finance">Finance</option>
+            <option value="Marketing">Marketing</option>
+        </select>
+
+        <p id="loadingMessage" style="display: none;">Loading employees...</p>
+        <p id="errorMessage" style="color: red; display: none;"></p>
+
+        <table border="1">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Position</th>
+                    <th>Department</th>
+                    <th>Contact</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="employeeTableBody">
+                <!-- Employee data will be inserted here -->
+            </tbody>
+        </table>
+
+        <div class="pagination">
+            <button id="prevPage">Previous</button>
+            <span id="pageInfo"></span>
+            <button id="nextPage">Next</button>
+        </div>
+    </div>
+
+    <!-- Edit Employee Modal -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Edit Employee</h2>
+            <form id="editForm">
+                <label>ID:</label>
+                <input type="text" id="editID" disabled>
+                <label>Name:</label>
+                <input type="text" id="editName">
+                <label>Position:</label>
+                <input type="text" id="editPosition">
+                <label>Department:</label>
+                <input type="text" id="editDepartment">
+                <label>Contact:</label>
+                <input type="text" id="editContact">
+                
+                <button type="submit">Save Changes</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const token = localStorage.getItem('token');
+            const departmentFilter = document.getElementById('departmentFilter');
+            const loadingMessage = document.getElementById('loadingMessage');
+            const errorMessage = document.getElementById('errorMessage');
+            const employeeTableBody = document.getElementById('employeeTableBody');
+            const prevPageBtn = document.getElementById('prevPage');
+            const nextPageBtn = document.getElementById('nextPage');
+            const pageInfo = document.getElementById('pageInfo');
+            let currentPage = 1;
+            const pageSize = 5;
+            let employees = [];
+
+            if (!token) {
+                alert('You are not logged in!');
+                window.location.href = 'login.html';
+                return;
+            }
+
+            function fetchEmployees(department = '') {
+                let url = 'employeeDetails';
+                if (department) {
+                    url += `?department=${encodeURIComponent(department)}`;
+                }
+
+                loadingMessage.style.display = 'block';
+                errorMessage.style.display = 'none';
+                employeeTableBody.innerHTML = '';
+
+                fetch(url, {
+                    method: 'GET',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(err => { throw new Error(err.message || "Failed to fetch employees"); });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    loadingMessage.style.display = 'none';
+                    employees = data;
+                    displayPage(1);
+                })
+                .catch(error => {
+                    loadingMessage.style.display = 'none';
+                    errorMessage.textContent = `Error: ${error.message}`;
+                    errorMessage.style.display = 'block';
+                });
+            }
+
+            function displayPage(page) {
+                employeeTableBody.innerHTML = '';
+                currentPage = page;
+                const start = (page - 1) * pageSize;
+                const end = start + pageSize;
+                const paginatedEmployees = employees.slice(start, end);
+
+                if (paginatedEmployees.length === 0) {
+                    employeeTableBody.innerHTML = '<tr><td colspan="6">No employees available.</td></tr>';
+                } else {
+                    paginatedEmployees.forEach(employee => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${employee.id}</td>
+                            <td>${employee.name}</td>
+                            <td>${employee.position}</td>
+                            <td>${employee.department}</td>
+                            <td>${employee.contact}</td>
+                            
+                            <td><button class="editBtn" data-id="${employee.employee_id}">Edit</button></td>
+                        `;
+                        employeeTableBody.appendChild(row);
+                    });
+                }
+
+                pageInfo.textContent = `Page ${currentPage} of ${Math.ceil(employees.length / pageSize)}`;
+                prevPageBtn.disabled = currentPage === 1;
+                nextPageBtn.disabled = end >= employees.length;
+            }
+
+            prevPageBtn.addEventListener('click', () => {
+                if (currentPage > 1) displayPage(currentPage - 1);
+            });
+
+            nextPageBtn.addEventListener('click', () => {
+                if (currentPage * pageSize < employees.length) displayPage(currentPage + 1);
+            });
+
+            departmentFilter.addEventListener('change', function () {
+                fetchEmployees(this.value);
+            });
+
+            fetchEmployees();
+
+            document.addEventListener('click', function (event) {
+                if (event.target.classList.contains('editBtn')) {
+                    const employeeId = event.target.dataset.id;
+                    const employee = employees.find(emp => emp.employee_id == employeeId);
+
+                    if (employee) {
+                        document.getElementById('editID').value = employee.id;
+                        document.getElementById('editName').value = employee.name;
+                        document.getElementById('editPosition').value = employee.position;
+                        document.getElementById('editDepartment').value = employee.department;
+                        document.getElementById('editContact').value = employee.contact;
+                        
+                        document.getElementById('editModal').style.display = 'block';
+                    }
+                }
+            });
+
+            document.querySelector('.close').addEventListener('click', function () {
+                document.getElementById('editModal').style.display = 'none';
+            });
+
+            document.getElementById('editForm').addEventListener('submit', function (event) {
+                event.preventDefault();
+                alert('Employee updated successfully!');
+                document.getElementById('editModal').style.display = 'none';
+                fetchEmployees(departmentFilter.value);
+            });
+        });
+    </script>
+</body>
+</html>

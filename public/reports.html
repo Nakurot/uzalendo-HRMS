@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Uzalendo Campus HRMS - Reports</title>
+    <link rel="stylesheet" href="report.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script> 
+
+</head>
+<body>
+    <div class="sidebar">
+        <a href="/dashboard.html">🏠 Dashboard</a>
+        <a href="/recruitment.html"> 💼 Recruitment</a>
+        <a href="/training.html">📈 Training</a>
+        <a href="/attendance.html">📅 Attendance</a>
+        <a href="/employeeDetails.html">👤 Employee Details</a>
+        <a href="/leaveRequest.html">📝 Leave Request</a>
+        <a href="/reports.html" class="active">📊 Reports</a>
+        
+    </div>
+
+    <div class="content">
+        <div class="header">📊 REPORTS</div>
+
+        <div class="filters">
+            <div>
+                <label>Department:</label>
+                <select id="departmentFilter">
+                    <option value="all">All</option>
+                    
+                </select>
+            </div>
+            <div>
+                <label>Date Range:</label>
+                <input type="date" id="startDate"> - <input type="date" id="endDate">
+            </div>
+            <div>
+                <label>Report Type:</label>
+                <select id="reportType">
+                    <option value="attendance">Attendance</option>
+                    <option value="leave">Leave</option>
+                    <option value="performance">Performance</option>
+                </select>
+            </div>
+            <button class="filter-button" onclick="applyFilters()">🔍 Apply Filters</button>
+        </div>
+
+        <div class="stats">
+            <div class="stat-box">👥 Total Employees: <span id="totalEmployees">0</span></div>
+            <div class="stat-box">📌 Attendance Rate: <span id="attendanceRate">0%</span></div>
+            <div class="stat-box">📄 Leave Statistics: <span id="leaveStats">0%</span></div>
+        </div>
+
+        <div class="charts">
+            <div class="chart-container">
+                <h3>📊 Leave Distribution</h3>
+                <canvas id="leaveChart"></canvas>
+            </div>
+            <div class="chart-container">
+                <h3>📈 Attendance Trends</h3>
+                <canvas id="attendanceChart"></canvas>
+            </div>
+        </div>
+
+        <div class="export-section">
+            <label>Export as:</label>
+            <button onclick="exportReport('csv')">📄 CSV</button>
+            <button onclick="exportReport('pdf')">📑 PDF</button>
+        </div>
+    </div>
+
+    <script>
+        let leaveChart = null;
+        let attendanceChart = null;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                window.location.href = '/login.html';
+                return;
+            }
+
+            try {
+                await fetchReportData();
+            } catch (error) {
+                console.error('Error fetching reports:', error);
+            }
+        });
+
+        async function fetchReportData(filters = {}) {
+    try {
+        const queryParams = new URLSearchParams(filters).toString();
+
+        console.log(`Fetching reports with: ${queryParams}`);
+
+        // Fetch total employees
+        const empRes = await fetch(`/employeeDetails?${queryParams}`, { headers: authHeader() });
+        const empData = await empRes.json();
+        console.log("Employee Data:", empData); // Debugging
+        document.getElementById('totalEmployees').textContent = empData.total || 0;
+
+        // Fetch attendance rate
+        const attRes = await fetch(`/attendance?${queryParams}`, { headers: authHeader() });
+        const attData = await attRes.json();
+        console.log("Attendance Data:", attData); // Debugging
+        document.getElementById('attendanceRate').textContent = `${(attData.attendance_rate || 0).toFixed(2)}%`;
+
+        // Fetch leave statistics
+        const leaveRes = await fetch(`/api/leaveRequests?${queryParams}`, { headers: authHeader() });
+        const leaveData = await leaveRes.json();
+        console.log("Leave Data:", leaveData); // Debugging
+        document.getElementById('leaveStats').textContent = `Approved: ${leaveData.approved || 0}, Pending: ${leaveData.pending || 0}, Rejected: ${leaveData.rejected || 0}`;
+
+        // Render charts
+        renderLeaveChart(leaveData);
+        renderAttendanceChart(attData);
+    } catch (error) {
+        console.error('Error loading reports:', error);
+    }
+}
+
+
+        function renderLeaveChart(data) {
+            const ctx = document.getElementById('leaveChart').getContext('2d');
+
+            if (leaveChart) leaveChart.destroy();
+
+            leaveChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Approved', 'Pending', 'Rejected'],
+                    datasets: [{
+                        label: 'Leave Requests',
+                        data: [data.approved || 0, data.pending || 0, data.rejected || 0],
+                        backgroundColor: ['#4CAF50', '#FFC107', '#F44336']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+        }
+
+        function renderAttendanceChart(data) {
+            const ctx = document.getElementById('attendanceChart').getContext('2d');
+
+            if (attendanceChart) attendanceChart.destroy();
+
+            attendanceChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
+                    datasets: [{
+                        label: 'Attendance Rate (%)',
+                        data: data.trends || [0, 0, 0, 0],
+                        borderColor: '#007BFF',
+                        backgroundColor: 'rgba(0, 123, 255, 0.2)',
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+        }
+
+        function authHeader() {
+            return { 'Authorization': `Bearer ${localStorage.getItem('token')}`, 'Content-Type': 'application/json' };
+        }
+
+        function applyFilters() {
+            const filters = {
+                reportType: document.getElementById('reportType').value,
+                startDate: document.getElementById('startDate').value,
+                endDate: document.getElementById('endDate').value
+            };
+            fetchReportData(filters);
+        }
+
+        function exportReport(format) {
+            const reportType = document.getElementById('reportType').value;
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+
+            const queryParams = new URLSearchParams({ format, reportType, startDate, endDate }).toString();
+            window.location.href = `/export-reports?${queryParams}`;
+        }
+    </script>
+</body>
+</html>
